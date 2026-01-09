@@ -292,27 +292,35 @@ function deleteCurrentScript() {
 
 jQuery(async () => {
     // 1. Load Settings UI
-    // Note: This matches the repository folder name 'sillytavern-simple-logic' in third-party extensions
-    const settingsHtml = await $.get('scripts/extensions/third-party/sillytavern-simple-logic/settings.html');
-    $('#extensions_settings').append(settingsHtml);
+    try {
+        // dynamic path detection using import.meta.url
+        const extensionUrl = import.meta.url; 
+        const extensionDir = extensionUrl.substring(0, extensionUrl.lastIndexOf('/'));
+        
+        const settingsHtml = await $.get(`${extensionDir}/settings.html`);
+        $('#extensions_settings').append(settingsHtml);
 
+        // 2. Init Settings
+        loadSettings();
 
-    // 2. Init Settings
-    loadSettings();
-
-    // 3. Bind UI Events
-    $('#simple-logic-add').on('click', () => {
-        selectedScriptIndex = -1;
-        $('#simple-logic-name').val('');
-        $('#simple-logic-content').val('');
+        // 3. Bind UI Events
+        $('#simple-logic-add').on('click', () => {
+            selectedScriptIndex = -1;
+            $('#simple-logic-name').val('');
+            $('#simple-logic-content').val('');
+            renderScriptList();
+        });
+        
+        $('#simple-logic-save').on('click', saveCurrentScript);
+        $('#simple-logic-delete').on('click', deleteCurrentScript);
+        
+        // Initial Render
         renderScriptList();
-    });
-    
-    $('#simple-logic-save').on('click', saveCurrentScript);
-    $('#simple-logic-delete').on('click', deleteCurrentScript);
-    
-    // Initial Render
-    renderScriptList();
+    } catch (err) {
+        console.error("[Simple Logic] Failed to load settings UI:", err);
+        toastr.error("Simple Logic: Failed to load UI. Check console.");
+    }
+
 
 
     // Register the macro
