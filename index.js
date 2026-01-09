@@ -107,6 +107,9 @@ const evaluateLogic = (script) => {
 
         // Helper to resolve value (Variable or Literal)
         const resolve = (val) => {
+            if (typeof val === 'number') return val;
+            if (typeof val !== 'string') return val;
+
             if (val.startsWith('"') && val.endsWith('"')) return val.slice(1, -1); // String literal
             if (!isNaN(parseFloat(val))) return parseFloat(val); // Number literal
             if (val.toLowerCase() === "true") return true;
