@@ -87,11 +87,23 @@ const evaluateLogic = (script) => {
         // clean up
         const parts = exprString.match(/"([^"]*)"|([=><!]+)|(\S+)/g); 
         
-        if (!parts || parts.length < 3) return false;
+        if (!parts) return false;
 
-        let leftVal = parts[0];
-        const op = parts[1];
-        let rightVal = parts[2];
+        let leftVal, op, rightVal;
+        
+        // Handle Missing LHS (e.g. " < 12" -> 0 < 12)
+        // This commonly happens if a variable macro resolves to empty string.
+        if (parts.length === 2 && /^[=><!]+$/.test(parts[0])) {
+            leftVal = 0;
+            op = parts[0];
+            rightVal = parts[1];
+        } else if (parts.length >= 3) {
+            leftVal = parts[0];
+            op = parts[1];
+            rightVal = parts[2];
+        } else {
+            return false;
+        }
 
         // Helper to resolve value (Variable or Literal)
         const resolve = (val) => {
@@ -121,6 +133,7 @@ const evaluateLogic = (script) => {
             case '>=': return v1 >= v2;
             case '<=': return v1 <= v2;
             case '==': return v1 == v2; // loose equality matches JS behavior
+            case '=': return v1 == v2; // forgiving assignment-as-equality
             case '!=': return v1 != v2;
             default: return false;
         }
