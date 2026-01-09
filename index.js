@@ -434,30 +434,9 @@ jQuery(async () => {
             setTimeout(registerLogicMacro, 1000);
         }
     };
-                        const scriptName = arg.trim();
-                        const saved = getSavedScript(scriptName);
-                        if (saved) {
-                            scriptContent = saved.content;
-                            console.log(`[Simple Logic] Found saved script '${scriptName}'`);
-                        } else {
-                            console.log(`[Simple Logic] No script found named '${scriptName}', assuming raw code.`);
-                        }
-                    }
-
-                    return evaluateLogic(scriptContent);
-                } catch (e) {
-                    console.error("Simple Logic Error:", e);
-                    return `[Logic Error: ${e.message}]`;
-                }
-            };
-
-            // Expected arguments configuration for the macro
-            const macroParams = ["script_or_name"];
-
-            // Strategy 1: Global 'macros' object
-            // This bypasses potential issues where registerMacro wrappers drop arguments.
-            const globalMacros = window.macros || (window.SillyTavern && window.SillyTavern.macros);
-            if (globalMacros) {
+    
+    registerLogicMacro();
+});
                  globalMacros.register("logic", logicMacroHandler, macroParams);
                  console.log("[Simple Logic] Macro registered via global macros.");
                  return;
