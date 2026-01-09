@@ -429,9 +429,15 @@ jQuery(async () => {
 
             // REGISTER
             if (macrosAPI && macrosAPI.registry && macrosAPI.registry.registerMacro) {
-                 macrosAPI.registry.registerMacro("logic", logicMacroHandler, ["script_or_name"]);
-                 console.log("[Simple Logic] Registered via DIRECT REGISTRY access (Success).");
-                 return;
+                 try {
+                     macrosAPI.registry.registerMacro("logic", logicMacroHandler, ["script_or_name"]);
+                     console.log("[Simple Logic] Registered via DIRECT REGISTRY access (Success).");
+                     return;
+                 } catch (regErr) {
+                     console.error("[Simple Logic] Direct Registration Failed:", regErr);
+                     // If it failed because it exists, we might want to return, or persist.
+                     // But usually, an error here means the macro is NOT usable.
+                 }
             } 
             
             // Fallback: Context API (known to cause 0-arg warning, but better than nothing)
