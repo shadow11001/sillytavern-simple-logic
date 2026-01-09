@@ -1,7 +1,12 @@
-import { getContext } from "../../extensions.js";
+import { getContext, extension_settings } from "../../../extensions.js";
+import { saveSettingsDebounced } from "../../../../script.js";
+
+const extensionName = "Simple Logic";
+const extensionKey = "simple_logic";
 
 /**
  * Simple Logic Extension
+
  * Adds a {{logic::...}} macro to parse a simplified IF/ELSE syntax.
  */
 
@@ -188,8 +193,126 @@ const evaluateLogic = (script) => {
     return outputBuffer.trim();
 };
 
+const defaultSettings = {
+    scripts: []
+};
+
+function loadSettings() {
+    if (!extension_settings[extensionKey]) {
+        extension_settings[extensionKey] = defaultSettings;
+    }
+}
+
+function getSavedScript(name) {
+    const settings = extension_settings[extensionKey];
+    if (!settings || !settings.scripts) return null;
+    return settings.scripts.find(s => s.name === name);
+}
+
+// --- UI HANDLING ---
+
+let selectedScriptIndex = -1;
+
+function renderScriptList() {
+    const listContainer = $('#simple-logic-list');
+    listContainer.empty();
+    
+    const settings = extension_settings[extensionKey];
+    const scripts = settings.scripts || [];
+
+    scripts.forEach((script, index) => {
+        const item = $(`<div class="menu_button ${index === selectedScriptIndex ? 'conf-btn-active' : ''}">${script.name}</div>`);
+        item.on('click', () => {
+             selectedScriptIndex = index;
+             loadScriptToEditor();
+             renderScriptList();
+        });
+        listContainer.append(item);
+    });
+}
+
+function loadScriptToEditor() {
+    const settings = extension_settings[extensionKey];
+    const scripts = settings.scripts || [];
+    
+    if (selectedScriptIndex >= 0 && selectedScriptIndex < scripts.length) {
+        const script = scripts[selectedScriptIndex];
+        $('#simple-logic-name').val(script.name);
+        $('#simple-logic-content').val(script.content);
+        $('#simple-logic-usage').text(`{{logic::${script.name}}}`);
+    } else {
+        // Clear editor
+        $('#simple-logic-name').val('');
+        $('#simple-logic-content').val('');
+        $('#simple-logic-usage').text('{{logic::scriptName}}');
+    }
+}
+
+function saveCurrentScript() {
+    const name = $('#simple-logic-name').val().trim();
+    const content = $('#simple-logic-content').val();
+    
+    if (!name) return toastr.error('Script must have a name');
+    
+    const settings = extension_settings[extensionKey];
+    if (!settings.scripts) settings.scripts = [];
+    
+    // Check if name exists (and isn't the one we are editing)
+    const existingIndex = settings.scripts.findIndex(s => s.name === name);
+    if (existingIndex !== -1 && existingIndex !== selectedScriptIndex) {
+        return toastr.error('A script with this name already exists');
+    }
+
+    if (selectedScriptIndex >= 0 && selectedScriptIndex < settings.scripts.length) {
+        // Update existing
+        settings.scripts[selectedScriptIndex] = { name, content };
+    } else {
+        // Add new
+        settings.scripts.push({ name, content });
+        selectedScriptIndex = settings.scripts.length - 1;
+    }
+    
+    saveSettingsDebounced();
+    renderScriptList();
+    loadScriptToEditor();
+    toastr.success('Script saved');
+}
+
+function deleteCurrentScript() {
+    if (selectedScriptIndex < 0) return;
+    
+    const settings = extension_settings[extensionKey];
+    settings.scripts.splice(selectedScriptIndex, 1);
+    selectedScriptIndex = -1;
+    
+    saveSettingsDebounced();
+    renderScriptList();
+    loadScriptToEditor();
+}
 
 jQuery(async () => {
+    // 1. Load Settings UI
+    const settingsHtml = await $.get('scripts/extensions/Extension-simple-logic/settings.html');
+    $('#extensions_settings').append(settingsHtml);
+
+    // 2. Init Settings
+    loadSettings();
+
+    // 3. Bind UI Events
+    $('#simple-logic-add').on('click', () => {
+        selectedScriptIndex = -1;
+        $('#simple-logic-name').val('');
+        $('#simple-logic-content').val('');
+        renderScriptList();
+    });
+    
+    $('#simple-logic-save').on('click', saveCurrentScript);
+    $('#simple-logic-delete').on('click', deleteCurrentScript);
+    
+    // Initial Render
+    renderScriptList();
+
+
     // Register the macro
     // Note: ST extensions import context dynamically usually.
     // We hook into the macro registration system.
@@ -206,7 +329,19 @@ jQuery(async () => {
                     // ARG contains the inner text of {{logic::ARG}}
                     if (!arg) return "";
                     try {
-                        return evaluateLogic(arg);
+                        let scriptContent = arg;
+                        
+                        // Check if it's a saved script name
+                        // We check if the argument contains newlines. If it has newlines, it's definitely raw code.
+                        // If it's a single word, it might be a script name.
+                        if (!arg.includes('\n')) {
+                            const saved = getSavedScript(arg.trim());
+                            if (saved) {
+                                scriptContent = saved.content;
+                            }
+                        }
+
+                        return evaluateLogic(scriptContent);
                     } catch (e) {
                         console.error("Simple Logic Error:", e);
                         return `[Logic Error: ${e.message}]`;

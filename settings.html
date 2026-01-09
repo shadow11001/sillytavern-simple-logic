@@ -1,0 +1,52 @@
+<div id="simple-logic-settings">
+    <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+            <b>Simple Logic Library</b>
+            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+        </div>
+        
+        <div class="inline-drawer-content">
+            <div class="simple-logic-container" style="display: flex; gap: 10px; height: 500px;">
+                <!-- Left: List of Scripts -->
+                <div class="simple-logic-sidebar" style="flex: 1; border-right: 1px solid var(--smart-theme-border);">
+                    <div style="margin-bottom: 5px;">
+                        <div id="simple-logic-add" class="menu_button menu_button_icon" title="Create New Script">
+                            <i class="fa-solid fa-plus"></i> New Script
+                        </div>
+                    </div>
+                    <div id="simple-logic-list" style="overflow-y: auto; height: calc(100% - 40px); display: flex; flex-direction: column; gap: 2px;">
+                        <!-- Script Items will be injected here -->
+                    </div>
+                </div>
+
+                <!-- Right: Editor -->
+                <div class="simple-logic-editor-area" style="flex: 3; display: flex; flex-direction: column; gap: 10px;">
+                    <div class="simple-logic-header" style="display: flex; gap: 10px; align-items: center;">
+                        <span style="font-weight: bold;">Name:</span>
+                        <input id="simple-logic-name" class="text_pole" type="text" placeholder="Script Name (e.g. combat_check)" style="flex: 1;" />
+                        <div id="simple-logic-save" class="menu_button menu_button_icon" title="Save Script">
+                            <i class="fa-solid fa-save"></i> Save
+                        </div>
+                        <div id="simple-logic-delete" class="menu_button menu_button_icon red" title="Delete Script">
+                            <i class="fa-solid fa-trash"></i>
+                        </div>
+                    </div>
+
+                    <div style="flex: 1; position: relative;">
+                        <textarea id="simple-logic-content" class="text_pole" style="width: 100%; height: 100%; font-family: monospace; resize: none;" 
+                        placeholder="IF age > 18&#10;  SAY 'Adult'&#10;ELSE&#10;  SAY 'Minor'&#10;END"></textarea>
+                    </div>
+
+                    <div class="simple-logic-footer">
+                        <small>Usage: <code id="simple-logic-usage">{{logic::scriptName}}</code> OR <code id="simple-logic-raw-usage">{{logic::Raw Code}}</code></small>
+                    </div>
+                </div>
+            </div>
+            
+            <hr>
+            <div style="margin-top: 10px;">
+                <i>Variable Helper: Use <code>SET var = value</code> to set, and just use variable names in IF conditions.</i>
+            </div>
+        </div>
+    </div>
+</div>
