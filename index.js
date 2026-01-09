@@ -75,6 +75,7 @@ const evaluateLogic = (script) => {
             if (!isNaN(parseFloat(val))) return parseFloat(val); // Number literal
             if (val.toLowerCase() === "true") return true;
             if (val.toLowerCase() === "false") return false;
+            if (val.toUpperCase() === "RANDOM") return Math.random(); // 0.0 to 1.0
             
             // Cleanup Syntax: {{getvar::varName}} or {{varName}} -> varName
             let cleanVal = val;
@@ -180,7 +181,7 @@ const evaluateLogic = (script) => {
                 outputBuffer += text + " ";
             }
         }
-        // COMMAND: SET
+        // COMMAND: SET (Legacy/Simple)
         else if (upperLine.startsWith("SET ")) {
             if (!currentScope.ignore) {
                 // Syntax: SET varName = value
@@ -191,6 +192,39 @@ const evaluateLogic = (script) => {
                     // Basic strip quotes
                     if (valStr.startsWith('"') && valStr.endsWith('"')) valStr = valStr.slice(1, -1);
                     setVariable(varName, valStr);
+                }
+            }
+        }
+        // COMMAND: SETVAR (Explicit Typed)
+        else if (upperLine.startsWith('SETVAR ')) {
+            if (!currentScope.ignore) {
+                const content = line.substring(7).trim();
+                const firstSpace = content.indexOf(' ');
+                
+                if (firstSpace !== -1) {
+                    const varName = content.substring(0, firstSpace).trim();
+                    let varValueRaw = content.substring(firstSpace + 1).trim();
+                    let varValue;
+
+                    // Simple type inference
+                    if (varValueRaw.startsWith('"') && varValueRaw.endsWith('"')) {
+                        // It's a string, strip quotes
+                        varValue = varValueRaw.slice(1, -1);
+                    } else if (!isNaN(parseFloat(varValueRaw)) && isFinite(varValueRaw)) {
+                        // It's a number
+                        varValue = parseFloat(varValueRaw);
+                    } else if (varValueRaw.toLowerCase() === 'true') {
+                        varValue = true;
+                    } else if (varValueRaw.toLowerCase() === 'false') {
+                        varValue = false;
+                    } else {
+                        // Treat as string fallback or variable lookup?
+                        // For now, simple fallback to string
+                        varValue = varValueRaw;
+                    }
+
+                    // Apply to SillyTavern Context
+                    setVariable(varName, varValue);
                 }
             }
         }
