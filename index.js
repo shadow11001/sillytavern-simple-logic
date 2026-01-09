@@ -384,8 +384,6 @@ jQuery(async () => {
     
     const registerLogicMacro = () => {
         try {
-            const context = getContext();
-
             // Define the handler function separately to reuse it
             const logicMacroHandler = (arg) => {
                 // ARG contains the inner text of {{logic::ARG}}
@@ -398,6 +396,44 @@ jQuery(async () => {
                     // If it's a single word, it might be a script name.
                     if (!arg.includes('\n')) {
                         // Trim and ensure we handle cases where getSavedScript might fail silently
+                        const scriptName = arg.trim();
+                        const saved = getSavedScript(scriptName);
+                        if (saved) {
+                            scriptContent = saved.content;
+                            console.log(`[Simple Logic] Found saved script '${scriptName}'`);
+                        } else {
+                            console.log(`[Simple Logic] No script found named '${scriptName}', assuming raw code.`);
+                        }
+                    }
+
+                    return evaluateLogic(scriptContent);
+                } catch (e) {
+                    console.error("Simple Logic Error:", e);
+                    return `[Logic Error: ${e.message}]`;
+                }
+            };
+            
+            // Try explicit global access to macros.registry (SillyTavern Standard)
+            if (window.macros && window.macros.registry) {
+                 window.macros.registry.registerMacro("logic", logicMacroHandler, ["script_or_name"]);
+                 console.log("[Simple Logic] Registered via window.macros.registry");
+                 return;
+            } 
+            
+            // Fallback: Context API
+            const context = getContext();
+            if (context && context.registerMacro) {
+                // Pass third argument for parameters to satisfy the parser
+                context.registerMacro("logic", logicMacroHandler, ["script_or_name"]);
+                console.log("[Simple Logic] Registered via context.registerMacro");
+            } else {
+                setTimeout(registerLogicMacro, 1000);
+            }
+        } catch (e) {
+            console.warn("[Simple Logic] Retrying registration...", e);
+            setTimeout(registerLogicMacro, 1000);
+        }
+    };
                         const scriptName = arg.trim();
                         const saved = getSavedScript(scriptName);
                         if (saved) {
