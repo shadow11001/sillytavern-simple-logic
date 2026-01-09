@@ -1,5 +1,5 @@
 import { getContext, extension_settings } from "../../../extensions.js";
-import { saveSettingsDebounced } from "../../../../script.js";
+import { saveSettingsDebounced, substituteParams } from "../../../../script.js";
 
 const extensionName = "Simple Logic";
 const extensionKey = "simple_logic";
@@ -103,7 +103,8 @@ const evaluateLogic = (script) => {
     };
 
     for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
+        // Expand macros ({{char}}, {{user}}, {{random}}, etc.)
+        const line = substituteParams(lines[i]);
         const upperLine = line.toUpperCase();
         const currentScope = executionStack[executionStack.length - 1];
 
