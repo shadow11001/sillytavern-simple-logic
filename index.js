@@ -1,5 +1,5 @@
 import { getContext, extension_settings } from "../../../extensions.js";
-import { saveSettingsDebounced } from "../../../../script.js";
+import { saveSettingsDebounced, macros } from "../../../../script.js";
 
 const extensionName = "Simple Logic";
 const extensionKey = "simple_logic";
@@ -384,9 +384,9 @@ jQuery(async () => {
     
     const registerLogicMacro = () => {
         try {
-            const context = getContext();
-            if (context && context.registerMacro) {
-                context.registerMacro("logic", (arg) => {
+            // Use the global macros registry if available to define arguments properly
+            if (macros && macros.registry && macros.registry.registerMacro) {
+                macros.registry.registerMacro("logic", (arg) => {
                     // ARG contains the inner text of {{logic::ARG}}
                     if (!arg) return "";
                     try {
@@ -412,13 +412,14 @@ jQuery(async () => {
                         console.error("Simple Logic Error:", e);
                         return `[Logic Error: ${e.message}]`;
                     }
-                });
-                console.log("[Simple Logic] Macro registered.");
+                }, ["script_or_name"]); // Define 1 argument
+                console.log("[Simple Logic] Macro registered via macros.registry.");
             } else {
+                // Fallback (or retry if logic module not ready)
                 setTimeout(registerLogicMacro, 1000);
             }
         } catch (e) {
-            console.warn("[Simple Logic] Retrying registration...");
+            console.warn("[Simple Logic] Retrying registration...", e);
             setTimeout(registerLogicMacro, 1000);
         }
     };
