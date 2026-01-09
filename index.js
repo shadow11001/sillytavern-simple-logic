@@ -292,8 +292,10 @@ function deleteCurrentScript() {
 
 jQuery(async () => {
     // 1. Load Settings UI
-    const settingsHtml = await $.get('scripts/extensions/Extension-simple-logic/settings.html');
+    // Note: This matches the repository folder name 'sillytavern-simple-logic' in third-party extensions
+    const settingsHtml = await $.get('scripts/extensions/third-party/sillytavern-simple-logic/settings.html');
     $('#extensions_settings').append(settingsHtml);
+
 
     // 2. Init Settings
     loadSettings();
