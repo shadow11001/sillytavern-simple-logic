@@ -437,24 +437,3 @@ jQuery(async () => {
     
     registerLogicMacro();
 });
-                 globalMacros.register("logic", logicMacroHandler, macroParams);
-                 console.log("[Simple Logic] Macro registered via global macros.");
-                 return;
-            }
-
-            // Strategy 2: Context registerMacro (fallback)
-            if (context && context.registerMacro) {
-                // Pass third argument for parameters to satisfy the parser
-                context.registerMacro("logic", logicMacroHandler, macroParams);
-                console.log("[Simple Logic] Macro registered via context.registerMacro.");
-            } else {
-                setTimeout(registerLogicMacro, 1000);
-            }
-        } catch (e) {
-            console.warn("[Simple Logic] Retrying registration...");
-            setTimeout(registerLogicMacro, 1000);
-        }
-    };
-    
-    registerLogicMacro();
-});
