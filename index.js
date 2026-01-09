@@ -413,20 +413,34 @@ jQuery(async () => {
                 }
             };
             
-            // Try explicit global access to macros.registry (SillyTavern Standard)
-            if (window.macros && window.macros.registry) {
-                 window.macros.registry.registerMacro("logic", logicMacroHandler, ["script_or_name"]);
-                 console.log("[Simple Logic] Registered via window.macros.registry");
+            // SEARCH FOR THE MACRO REGISTRY
+            // We need to find the underlying registry because context.registerMacro often fails to pass arguments correctly.
+            let macrosAPI = null;
+
+            // 1. Direct window export (some versions)
+            if (window.macros) macrosAPI = window.macros;
+            // 2. SillyTavern global namespace
+            else if (window.SillyTavern && window.SillyTavern.macros) macrosAPI = window.SillyTavern.macros;
+            // 3. Via Context (some versions expose it)
+            else {
+                const ctx = getContext();
+                if (ctx && ctx.macros) macrosAPI = ctx.macros;
+            }
+
+            // REGISTER
+            if (macrosAPI && macrosAPI.registry && macrosAPI.registry.registerMacro) {
+                 macrosAPI.registry.registerMacro("logic", logicMacroHandler, ["script_or_name"]);
+                 console.log("[Simple Logic] Registered via DIRECT REGISTRY access (Success).");
                  return;
             } 
             
-            // Fallback: Context API
+            // Fallback: Context API (known to cause 0-arg warning, but better than nothing)
             const context = getContext();
             if (context && context.registerMacro) {
-                // Pass third argument for parameters to satisfy the parser
+                console.warn("[Simple Logic] Warning: Using legacy context.registerMacro. Arguments may fail.");
                 context.registerMacro("logic", logicMacroHandler, ["script_or_name"]);
-                console.log("[Simple Logic] Registered via context.registerMacro");
             } else {
+                console.log("[Simple Logic] Registry not found yet, retrying...");
                 setTimeout(registerLogicMacro, 1000);
             }
         } catch (e) {
