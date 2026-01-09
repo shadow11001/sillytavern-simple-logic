@@ -385,11 +385,23 @@ jQuery(async () => {
     const registerLogicMacro = () => {
         try {
             // Define the handler function separately to reuse it
-            // NOTE: Using a named function 'logicMacroHandler' with argument 'args' matching the config below.
-            // This prevents validation errors in some ST versions that inspect source code.
-            function logicMacroHandler(args) {
-                // args contains the inner text of {{logic::args}}
-                if (!args) return "";
+            // New signature: receives a Context Object
+            function logicMacroHandler(data) {
+                // If data is a string (Legacy Legacy), handle it
+                let args = data; 
+                // If data is object (Modern), extract args[0]
+                if (typeof data === 'object' && data !== null) {
+                     if (Array.isArray(data.args) && data.args.length > 0) {
+                         args = data.args[0];
+                     } else if (typeof data.args === 'string') {
+                         args = data.args;
+                     } else {
+                         args = ""; // No args provided
+                     }
+                }
+
+                if (!args || typeof args !== 'string') return "";
+                
                 try {
                     let scriptContent = args;
                     
@@ -419,9 +431,10 @@ jQuery(async () => {
             // New registry signature requires an Options object
             const macroOptions = {
                 handler: logicMacroHandler,
+                description: "Simple Logic Script Executor",
                 unnamedArgs: [
                     {
-                        name: "args",
+                        name: "script",
                         type: "string",
                         description: "Script Name or Content"
                     }
@@ -443,22 +456,39 @@ jQuery(async () => {
             }
 
             // REGISTER
-            if (macrosAPI && macrosAPI.registry && macrosAPI.registry.registerMacro) {
+            let registered = false;
+            
+            // Modern "register" method (preferred public API)
+            if (macrosAPI && typeof macrosAPI.register === 'function') {
+                 try {
+                     macrosAPI.register("simplelogic", macroOptions);
+                     console.log("[Simple Logic] Registered 'simplelogic' via macros.register().");
+                     registered = true;
+                 } catch (regErr) {
+                     console.error("[Simple Logic] macros.register() Failed:", regErr);
+                 }
+            }
+            // Internal "registry.registerMacro" (fallback for older staging)
+            else if (macrosAPI && macrosAPI.registry && macrosAPI.registry.registerMacro) {
                  try {
                      macrosAPI.registry.registerMacro("simplelogic", macroOptions);
-                     console.log("[Simple Logic] Registered 'simplelogic' via DIRECT REGISTRY access (Success).");
-                     return;
+                     console.log("[Simple Logic] Registered 'simplelogic' via registry.registerMacro().");
+                     registered = true;
                  } catch (regErr) {
-                     console.error("[Simple Logic] Direct Registration Failed:", regErr);
+                     console.error("[Simple Logic] registry.registerMacro() Failed:", regErr);
                  }
             } 
             
+            if (registered) return;
+
             // Fallback: Context API (Legacy)
             const context = getContext();
             if (context && context.registerMacro) {
                 // If legacy, we pass the old signature (name, handler, paramsArray)
-                console.warn("[Simple Logic] Warning: Using legacy context.registerMacro.");
-                context.registerMacro("simplelogic", logicMacroHandler, ["args"]);
+                console.warn("[Simple Logic] Warning: Using legacy context.registerMacro. Arguments may fail.");
+                // Note: Legacy expects handler to take 'arg' string directly.
+                // Our unified handler checks type, so it should auto-adapt.
+                context.registerMacro("simplelogic", logicMacroHandler, ["script"]);
             } else {
                 console.log("[Simple Logic] Registry not found yet, retrying...");
                 setTimeout(registerLogicMacro, 1000);
