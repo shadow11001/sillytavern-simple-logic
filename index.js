@@ -385,36 +385,53 @@ jQuery(async () => {
     const registerLogicMacro = () => {
         try {
             const context = getContext();
+
+            // Define the handler function separately to reuse it
+            const logicMacroHandler = (arg) => {
+                // ARG contains the inner text of {{logic::ARG}}
+                if (!arg) return "";
+                try {
+                    let scriptContent = arg;
+                    
+                    // Check if it's a saved script name
+                    // We check if the argument contains newlines. If it has newlines, it's definitely raw code.
+                    // If it's a single word, it might be a script name.
+                    if (!arg.includes('\n')) {
+                        // Trim and ensure we handle cases where getSavedScript might fail silently
+                        const scriptName = arg.trim();
+                        const saved = getSavedScript(scriptName);
+                        if (saved) {
+                            scriptContent = saved.content;
+                            console.log(`[Simple Logic] Found saved script '${scriptName}'`);
+                        } else {
+                            console.log(`[Simple Logic] No script found named '${scriptName}', assuming raw code.`);
+                        }
+                    }
+
+                    return evaluateLogic(scriptContent);
+                } catch (e) {
+                    console.error("Simple Logic Error:", e);
+                    return `[Logic Error: ${e.message}]`;
+                }
+            };
+
+            // Expected arguments configuration for the macro
+            const macroParams = ["script_or_name"];
+
+            // Strategy 1: Global 'macros' object
+            // This bypasses potential issues where registerMacro wrappers drop arguments.
+            const globalMacros = window.macros || (window.SillyTavern && window.SillyTavern.macros);
+            if (globalMacros) {
+                 globalMacros.register("logic", logicMacroHandler, macroParams);
+                 console.log("[Simple Logic] Macro registered via global macros.");
+                 return;
+            }
+
+            // Strategy 2: Context registerMacro (fallback)
             if (context && context.registerMacro) {
                 // Pass third argument for parameters to satisfy the parser
-                context.registerMacro("logic", (arg) => {
-                    // ARG contains the inner text of {{logic::ARG}}
-                    if (!arg) return "";
-                    try {
-                        let scriptContent = arg;
-                        
-                        // Check if it's a saved script name
-                        // We check if the argument contains newlines. If it has newlines, it's definitely raw code.
-                        // If it's a single word, it might be a script name.
-                        if (!arg.includes('\n')) {
-                            // Trim and ensure we handle cases where getSavedScript might fail silently
-                            const scriptName = arg.trim();
-                            const saved = getSavedScript(scriptName);
-                            if (saved) {
-                                scriptContent = saved.content;
-                                console.log(`[Simple Logic] Found saved script '${scriptName}'`);
-                            } else {
-                                console.log(`[Simple Logic] No script found named '${scriptName}', assuming raw code.`);
-                            }
-                        }
-
-                        return evaluateLogic(scriptContent);
-                    } catch (e) {
-                        console.error("Simple Logic Error:", e);
-                        return `[Logic Error: ${e.message}]`;
-                    }
-                }, ["script_or_name"]);
-                console.log("[Simple Logic] Macro registered.");
+                context.registerMacro("logic", logicMacroHandler, macroParams);
+                console.log("[Simple Logic] Macro registered via context.registerMacro.");
             } else {
                 setTimeout(registerLogicMacro, 1000);
             }
