@@ -385,18 +385,20 @@ jQuery(async () => {
     const registerLogicMacro = () => {
         try {
             // Define the handler function separately to reuse it
-            const logicMacroHandler = (arg) => {
-                // ARG contains the inner text of {{logic::ARG}}
-                if (!arg) return "";
+            // NOTE: Using a named function 'logicMacroHandler' with argument 'args' matching the config below.
+            // This prevents validation errors in some ST versions that inspect source code.
+            function logicMacroHandler(args) {
+                // args contains the inner text of {{logic::args}}
+                if (!args) return "";
                 try {
-                    let scriptContent = arg;
+                    let scriptContent = args;
                     
                     // Check if it's a saved script name
                     // We check if the argument contains newlines. If it has newlines, it's definitely raw code.
                     // If it's a single word, it might be a script name.
-                    if (!arg.includes('\n')) {
+                    if (!args.includes('\n')) {
                         // Trim and ensure we handle cases where getSavedScript might fail silently
-                        const scriptName = arg.trim();
+                        const scriptName = args.trim();
                         const saved = getSavedScript(scriptName);
                         if (saved) {
                             scriptContent = saved.content;
@@ -411,7 +413,10 @@ jQuery(async () => {
                     console.error("Simple Logic Error:", e);
                     return `[Logic Error: ${e.message}]`;
                 }
-            };
+            }
+            
+            // Expected arguments configuration for the macro
+            const macroParams = ["args"];
             
             // SEARCH FOR THE MACRO REGISTRY
             // We need to find the underlying registry because context.registerMacro often fails to pass arguments correctly.
@@ -430,7 +435,7 @@ jQuery(async () => {
             // REGISTER
             if (macrosAPI && macrosAPI.registry && macrosAPI.registry.registerMacro) {
                  try {
-                     macrosAPI.registry.registerMacro("simplelogic", logicMacroHandler, ["script_or_name"]);
+                     macrosAPI.registry.registerMacro("simplelogic", logicMacroHandler, macroParams);
                      console.log("[Simple Logic] Registered 'simplelogic' via DIRECT REGISTRY access (Success).");
                      return;
                  } catch (regErr) {
@@ -444,7 +449,7 @@ jQuery(async () => {
             const context = getContext();
             if (context && context.registerMacro) {
                 console.warn("[Simple Logic] Warning: Using legacy context.registerMacro. Arguments may fail.");
-                context.registerMacro("simplelogic", logicMacroHandler, ["script_or_name"]);
+                context.registerMacro("simplelogic", logicMacroHandler, macroParams);
             } else {
                 console.log("[Simple Logic] Registry not found yet, retrying...");
                 setTimeout(registerLogicMacro, 1000);
