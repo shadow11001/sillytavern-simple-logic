@@ -430,8 +430,8 @@ jQuery(async () => {
             // REGISTER
             if (macrosAPI && macrosAPI.registry && macrosAPI.registry.registerMacro) {
                  try {
-                     macrosAPI.registry.registerMacro("logic", logicMacroHandler, ["script_or_name"]);
-                     console.log("[Simple Logic] Registered via DIRECT REGISTRY access (Success).");
+                     macrosAPI.registry.registerMacro("simplelogic", logicMacroHandler, ["script_or_name"]);
+                     console.log("[Simple Logic] Registered 'simplelogic' via DIRECT REGISTRY access (Success).");
                      return;
                  } catch (regErr) {
                      console.error("[Simple Logic] Direct Registration Failed:", regErr);
@@ -444,7 +444,7 @@ jQuery(async () => {
             const context = getContext();
             if (context && context.registerMacro) {
                 console.warn("[Simple Logic] Warning: Using legacy context.registerMacro. Arguments may fail.");
-                context.registerMacro("logic", logicMacroHandler, ["script_or_name"]);
+                context.registerMacro("simplelogic", logicMacroHandler, ["script_or_name"]);
             } else {
                 console.log("[Simple Logic] Registry not found yet, retrying...");
                 setTimeout(registerLogicMacro, 1000);
