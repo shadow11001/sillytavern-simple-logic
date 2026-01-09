@@ -12,29 +12,53 @@ const extensionKey = "simple_logic";
 
 const getVariable = (varName) => {
     const context = getContext();
-    // Try global first, then local/chat variables if needed. 
-    // Usually macro variables in ST are global or temporary.
-    // We will stick to global context.variables for now.
+    // Try local/chat variables first (shadowing), then global.
     const vars = context.variables;
     
-    // Check if variables API is available (depending on ST version)
-    if (vars && vars.global) {
-       let val = vars.global.get(varName);
-       // Attempt to return numbers as numbers
-       if (!isNaN(parseFloat(val)) && isFinite(val)) {
-           return parseFloat(val);
-       }
-       return val;
+    // Check if variables API is available
+    if (vars) {
+        // Check Local (prioritize)
+        if (vars.local && vars.local.has(varName)) {
+            let val = vars.local.get(varName);
+            if (!isNaN(parseFloat(val)) && isFinite(val)) return parseFloat(val);
+            if (val === "true") return true; 
+            if (val === "false") return false;
+            return val;
+        }
+
+        // Check Global
+        if (vars.global && vars.global.has(varName)) {
+           let val = vars.global.get(varName);
+           // Attempt to return numbers as numbers
+           if (!isNaN(parseFloat(val)) && isFinite(val)) return parseFloat(val);
+           if (val === "true") return true; 
+           if (val === "false") return false;
+           return val;
+        }
     }
     return null;
 };
 
 const setVariable = (varName, value) => {
     const context = getContext();
-    if (context.variables && context.variables.global) {
-        // Automatically quote strings if they are tokens, 
-        // but for now we assume value is pre-processed or a raw string/number.
-        context.variables.global.set(varName, value.toString());
+    const vars = context.variables;
+
+    if (vars) {
+        const valStr = value.toString();
+
+        // If variable exists in Local scope, update it there (maintain scope)
+        if (vars.local && vars.local.has(varName)) {
+            vars.local.set(varName, valStr);
+            return;
+        }
+
+        // Otherwise write to Global
+        if (vars.global) {
+            // Automatically quote strings if they are tokens, 
+            // but for now we assume value is pre-processed or a raw string/number.
+            vars.global.set(varName, valStr);
+            saveSettingsDebounced();
+        }
     }
 };
 
