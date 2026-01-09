@@ -73,11 +73,17 @@ const evaluateLogic = (script) => {
         const resolve = (val) => {
             if (val.startsWith('"') && val.endsWith('"')) return val.slice(1, -1); // String literal
             if (!isNaN(parseFloat(val))) return parseFloat(val); // Number literal
-            if (val === "true") return true;
-            if (val === "false") return false;
+            if (val.toLowerCase() === "true") return true;
+            if (val.toLowerCase() === "false") return false;
             
+            // Cleanup Syntax: {{getvar::varName}} or {{varName}} -> varName
+            let cleanVal = val;
+            if (cleanVal.startsWith("{{")) {
+                cleanVal = cleanVal.replace(/^{{\s*(getvar::)?/, "").replace(/}}$/, "").trim();
+            }
+
             // Assume variable
-            const lookedUp = getVariable(val);
+            const lookedUp = getVariable(cleanVal);
             return lookedUp === null || lookedUp === undefined ? 0 : lookedUp; 
         };
 
@@ -390,9 +396,14 @@ jQuery(async () => {
                         // We check if the argument contains newlines. If it has newlines, it's definitely raw code.
                         // If it's a single word, it might be a script name.
                         if (!arg.includes('\n')) {
-                            const saved = getSavedScript(arg.trim());
+                            // Trim and ensure we handle cases where getSavedScript might fail silently
+                            const scriptName = arg.trim();
+                            const saved = getSavedScript(scriptName);
                             if (saved) {
                                 scriptContent = saved.content;
+                                console.log(`[Simple Logic] Found saved script '${scriptName}'`);
+                            } else {
+                                console.log(`[Simple Logic] No script found named '${scriptName}', assuming raw code.`);
                             }
                         }
 
