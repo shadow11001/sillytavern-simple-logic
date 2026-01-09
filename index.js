@@ -17,9 +17,9 @@ const getVariable = (varName) => {
     
     // Check if variables API is available
     if (vars) {
-        // Check Local (prioritize)
-        if (vars.local && vars.local.has(varName)) {
-            let val = vars.local.get(varName);
+        // Check Local (prioritize) - Plain Object
+        if (vars.local && vars.local[varName] !== undefined) {
+            let val = vars.local[varName];
             if (!isNaN(parseFloat(val)) && isFinite(val)) return parseFloat(val);
             if (val === "true") return true; 
             if (val === "false") return false;
@@ -47,8 +47,8 @@ const setVariable = (varName, value) => {
         const valStr = value.toString();
 
         // If variable exists in Local scope, update it there (maintain scope)
-        if (vars.local && vars.local.has(varName)) {
-            vars.local.set(varName, valStr);
+        if (vars.local && vars.local[varName] !== undefined) {
+            vars.local[varName] = valStr;
             return;
         }
 
