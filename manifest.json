@@ -1,7 +1,7 @@
 {
     "name": "Simple Logic Macro",
     "display_name": "Simple Logic Macro",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "author": "GitHub Copilot",
     "description": "Adds a {{logic}} macro that supports clean IF/ELSE scripting syntax for World Info and Prompts.",
     "js": "index.js",
