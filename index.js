@@ -22,22 +22,14 @@ const getVariable = (varName) => {
     };
 
     if (vars) {
-        // 1. Local (Shadowing)
-        let val = get(vars.local, varName);
-        if (val !== undefined) return normalizeValue(val);
-
-        // 2. Global
-        val = get(vars.global, varName);
+        // 1. Global (Only)
+        let val = get(vars.global, varName);
         if (val !== undefined) return normalizeValue(val);
     }
     
-    // 3. Fallbacks (Direct Global/Window access)
-    // Sometimes context is stale or structure differs
+    // 2. Fallbacks (Direct Global/Window access)
+    // Only check global_variables
     if (typeof window !== 'undefined') {
-        if (window.chat_metadata && window.chat_metadata.variables) {
-            let val = window.chat_metadata.variables[varName];
-            if (val !== undefined) return normalizeValue(val);
-        }
         if (window.global_variables) {
             let val = window.global_variables[varName];
              if (val !== undefined) return normalizeValue(val);
@@ -73,15 +65,8 @@ const setVariable = (varName, value) => {
     };
 
     if (vars) {
-        // 1. Update Local if exists
-        const hasLocal = (vars.local && (typeof vars.local.has === 'function' ? vars.local.has(varName) : vars.local[varName] !== undefined));
-        
-        if (hasLocal) {
-            set(vars.local, varName, valStr);
-            setSuccess = true;
-        } 
-        // 2. Else Default to Global
-        else if (vars.global) {
+        // 1. Force Global
+        if (vars.global) {
              set(vars.global, varName, valStr);
              setSuccess = true;
         }
