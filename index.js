@@ -12,53 +12,94 @@ const extensionKey = "simple_logic";
 
 const getVariable = (varName) => {
     const context = getContext();
-    // Try local/chat variables first (shadowing), then global.
     const vars = context.variables;
     
-    // Check if variables API is available
-    if (vars) {
-        // Check Local (prioritize) - Plain Object
-        if (vars.local && vars.local[varName] !== undefined) {
-            let val = vars.local[varName];
-            if (!isNaN(parseFloat(val)) && isFinite(val)) return parseFloat(val);
-            if (val === "true") return true; 
-            if (val === "false") return false;
-            return val;
-        }
+    // Helper to get from Obj or Map
+    const get = (storage, key) => {
+        if (!storage) return undefined;
+        if (typeof storage.get === 'function') return storage.get(key);
+        return storage[key];
+    };
 
-        // Check Global
-        if (vars.global && vars.global[varName] !== undefined) {
-           let val = vars.global[varName];
-           // Attempt to return numbers as numbers
-           if (!isNaN(parseFloat(val)) && isFinite(val)) return parseFloat(val);
-           if (val === "true") return true; 
-           if (val === "false") return false;
-           return val;
+    if (vars) {
+        // 1. Local (Shadowing)
+        let val = get(vars.local, varName);
+        if (val !== undefined) return normalizeValue(val);
+
+        // 2. Global
+        val = get(vars.global, varName);
+        if (val !== undefined) return normalizeValue(val);
+    }
+    
+    // 3. Fallbacks (Direct Global/Window access)
+    // Sometimes context is stale or structure differs
+    if (typeof window !== 'undefined') {
+        if (window.chat_metadata && window.chat_metadata.variables) {
+            let val = window.chat_metadata.variables[varName];
+            if (val !== undefined) return normalizeValue(val);
+        }
+        if (window.global_variables) {
+            let val = window.global_variables[varName];
+             if (val !== undefined) return normalizeValue(val);
         }
     }
+
     return null;
 };
+
+const normalizeValue = (val) => {
+    if (!isNaN(parseFloat(val)) && isFinite(val)) return parseFloat(val);
+    if (val === "true") return true; 
+    if (val === "false") return false;
+    return val;
+}
 
 const setVariable = (varName, value) => {
     const context = getContext();
     const vars = context.variables;
+    const valStr = value.toString();
+
+    let setSuccess = false;
+
+    // Helper to set to Obj or Map
+    const set = (storage, key, val) => {
+        if (!storage) return false;
+        if (typeof storage.set === 'function') {
+            storage.set(key, val);
+            return true;
+        }
+        storage[key] = val;
+        return true;
+    };
 
     if (vars) {
-        const valStr = value.toString();
-
-        // If variable exists in Local scope, update it there (maintain scope)
-        if (vars.local && vars.local[varName] !== undefined) {
-            vars.local[varName] = valStr;
-            return;
+        // 1. Update Local if exists
+        const hasLocal = (vars.local && (typeof vars.local.has === 'function' ? vars.local.has(varName) : vars.local[varName] !== undefined));
+        
+        if (hasLocal) {
+            set(vars.local, varName, valStr);
+            setSuccess = true;
+        } 
+        // 2. Else Default to Global
+        else if (vars.global) {
+             set(vars.global, varName, valStr);
+             setSuccess = true;
         }
+    }
 
-        // Otherwise write to Global
-        if (vars.global) {
-            // Automatically quote strings if they are tokens, 
-            // but for now we assume value is pre-processed or a raw string/number.
-            vars.global[varName] = valStr;
-            saveSettingsDebounced();
-        }
+    // 3. Fallback Writing (ensure persistence)
+    if (!setSuccess && typeof window !== 'undefined') {
+         if (window.global_variables) {
+             window.global_variables[varName] = valStr;
+             setSuccess = true;
+         }
+    }
+
+    if (setSuccess) {
+        console.debug(`[SimpleLogic] SETVAR "${varName}" = "${valStr}"`);
+        saveSettingsDebounced();
+    } else {
+        console.warn(`[SimpleLogic] SETVAR Failed for "${varName}" - No storage found!`);
     }
 };
 
