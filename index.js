@@ -27,8 +27,8 @@ const getVariable = (varName) => {
         }
 
         // Check Global
-        if (vars.global && vars.global.has(varName)) {
-           let val = vars.global.get(varName);
+        if (vars.global && vars.global[varName] !== undefined) {
+           let val = vars.global[varName];
            // Attempt to return numbers as numbers
            if (!isNaN(parseFloat(val)) && isFinite(val)) return parseFloat(val);
            if (val === "true") return true; 
@@ -56,7 +56,7 @@ const setVariable = (varName, value) => {
         if (vars.global) {
             // Automatically quote strings if they are tokens, 
             // but for now we assume value is pre-processed or a raw string/number.
-            vars.global.set(varName, valStr);
+            vars.global[varName] = valStr;
             saveSettingsDebounced();
         }
     }
