@@ -87,7 +87,10 @@ const evaluateLogic = (script) => {
         // clean up
         const parts = exprString.match(/"([^"]*)"|([=><!]+)|(\S+)/g); 
         
-        if (!parts) return false;
+        if (!parts) {
+            console.debug(`[SimpleLogic] Failed to parse expr: "${exprString}"`);
+            return false;
+        }
 
         let leftVal, op, rightVal;
         
@@ -97,11 +100,13 @@ const evaluateLogic = (script) => {
             leftVal = 0;
             op = parts[0];
             rightVal = parts[1];
+            console.debug(`[SimpleLogic] Missing LHS. Defaulting to 0. Expr: "0 ${op} ${rightVal}"`);
         } else if (parts.length >= 3) {
             leftVal = parts[0];
             op = parts[1];
             rightVal = parts[2];
         } else {
+            console.debug(`[SimpleLogic] Invalid part count: ${parts.length}`);
             return false;
         }
 
@@ -118,17 +123,21 @@ const evaluateLogic = (script) => {
             
             // Cleanup Syntax: {{getvar::varName}} or {{varName}} -> varName
             let cleanVal = val;
+            // Note: If ST already resolved {{getvar::...}} to "", this loop receives "" which resolve() treats as variable logic likely fails or becomes 0.
             if (cleanVal.startsWith("{{")) {
                 cleanVal = cleanVal.replace(/^{{\s*(getvar::)?/, "").replace(/}}$/, "").trim();
             }
 
             // Assume variable
             const lookedUp = getVariable(cleanVal);
+            console.debug(`[SimpleLogic] Resolve "${val}" -> Var "${cleanVal}" -> Value:`, lookedUp);
             return lookedUp === null || lookedUp === undefined ? 0 : lookedUp; 
         };
 
         const v1 = resolve(leftVal);
         const v2 = resolve(rightVal);
+
+        console.debug(`[SimpleLogic] Compare: ${v1} ${op} ${v2}`);
 
         switch (op) {
             case '>': return v1 > v2;
@@ -172,8 +181,11 @@ const evaluateLogic = (script) => {
         
         // Expand macros ({{char}}, {{user}}, {{random}}, etc.) safely now
         const line = substituteParams(rawLine);
-        upperLine = line.toUpperCase();
-        currentScope = executionStack[executionStack.length - 1]; // Refresh in case weirdness? No.
+        upperLine = line.trim().toUpperCase();
+        currentScope = executionStack[executionStack.length - 1]; 
+
+        // Debug Logging (Temporary, via Browser Console)
+        console.debug(`[SimpleLogic] Line: "${line}" | Upper: "${upperLine}"`);
 
         // CONTROL FLOW: IF
         if (upperLine.startsWith("IF ")) {
