@@ -173,6 +173,9 @@ const evaluateLogic = (script) => {
             case '==': return v1 == v2; // loose equality matches JS behavior
             case '=': return v1 == v2; // forgiving assignment-as-equality
             case '!=': return v1 != v2;
+            case 'CONTAINS': 
+            case 'HAS':
+                return String(v1).toLowerCase().includes(String(v2).toLowerCase());
             default: return false;
         }
     };
@@ -221,7 +224,20 @@ const evaluateLogic = (script) => {
                  continue;
             }
             
-            const conditionStr = line.substring(3).trim();
+            // Special Keywords Pre-processing
+            let conditionStr = line.substring(3).trim();
+            // Handle LAST_MESSAGE keyword
+            if (conditionStr.includes("LAST_MESSAGE")) {
+                const context = getContext();
+                let msg = "";
+                if (context.chat && context.chat.length > 0) {
+                     msg = context.chat[context.chat.length - 1].mes;
+                     // Sanitize for string comparison
+                     msg = msg.replace(/"/g, "'");
+                }
+                conditionStr = conditionStr.replace(/LAST_MESSAGE/g, `"${msg}"`);
+            }
+            
             const result = parseExpression(conditionStr);
             executionStack.push({ ignore: !result, metCondition: result });
         }
@@ -247,7 +263,18 @@ const evaluateLogic = (script) => {
              if (prevScope.metCondition) {
                  prevScope.ignore = true;
              } else {
-                 const conditionStr = line.substring(8).trim();
+                 let conditionStr = line.substring(8).trim();
+                 // Handle LAST_MESSAGE keyword
+                 if (conditionStr.includes("LAST_MESSAGE")) {
+                     const context = getContext();
+                     let msg = "";
+                     if (context.chat && context.chat.length > 0) {
+                          msg = context.chat[context.chat.length - 1].mes;
+                          msg = msg.replace(/"/g, "'");
+                     }
+                     conditionStr = conditionStr.replace(/LAST_MESSAGE/g, `"${msg}"`);
+                 }
+
                  const result = parseExpression(conditionStr);
                  prevScope.ignore = !result;
                  if (result) prevScope.metCondition = true;
@@ -355,6 +382,140 @@ function getSavedScript(name) {
     return settings.scripts.find(s => s.name === name);
 }
 
+// --- AI ANALYSIS HELPERS ---
+
+async function generateAnalysis() {
+    // 1. Get Params
+    const profileId = $('#simple-logic-ai-profile').val();
+    const depth = parseInt($('#simple-logic-ai-depth').val()) || 15;
+    const source = $('#simple-logic-ai-source').val() || 'all';
+    const mode = $('#simple-logic-ai-mode').val() || 'script';
+
+    const context = getContext();
+    const service = context.ConnectionManagerRequestService;
+
+    if (!service) return toastr.error("Connection Manager not found. Update SillyTavern.");
+    if (!profileId) return toastr.error("Select a Connection Profile first.");
+
+    $('#simple-logic-ai-result').html("<i>Generating analysis... please wait...</i>").show();
+
+    // 2. Build History
+    let chat = context.chat || [];
+    if (source === 'user') chat = chat.filter(m => m.is_user);
+    if (source === 'char') chat = chat.filter(m => !m.is_user);
+
+    const history = chat.slice(-depth).map(msg => {
+        return `${msg.is_user ? 'User' : (msg.name || 'Char')}: ${msg.mes}`;
+    }).join("\n");
+
+    // 3. Construct System Prompt
+    let instructions = "";
+    if (mode === 'script') {
+        instructions = `Then, create 3 unique "Simple Logic" Scripts to introduce randomness or events.
+    
+    The Script Format is:
+    IF RANDOM < 0.3
+      SAY "Something unexpected happens."
+      SETVAR something "true"
+    ELSE
+      SAY "Things remain calm."
+    END
+    
+    Use the keyword LAST_MESSAGE to check the last text effectively (e.g. IF LAST_MESSAGE CONTAINS "fight").`;
+    } 
+    else if (mode === 'keywords') {
+        instructions = `Often, simple keyword checks are safer than random events. 
+        Suggest 5 specific keywords or phrases found in the text that would be good triggers.
+        Return them as snippets like: IF LAST_MESSAGE CONTAINS "sword" ... END`;
+    }
+    else {
+        instructions = `Analyze the roleplay dynamic. Suggest what kind of Logic Scripts (Random events, state tracking) would improve it. 
+        Return the suggestions in the code block as comments or pseudo-code snippets.`;
+    }
+
+    const prompt = `Analyze the following Roleplay Chat history (Last ${depth} messages). 
+    Identify the current narrative tone and logical next steps. 
+    ${instructions}
+    
+    Output ONLY a JSON object with this structure:
+    {
+       "analysis": "Short summary of tone",
+       "suggestions": [
+           { "name": "Event Name", "code": "IF ... END" },
+           { "name": "Event Name 2", "code": "IF ... END" }
+       ]
+    }
+    
+    Chat History:
+    ${history}`;
+
+    // 4. Send Request
+    try {
+        const messages = [{ role: 'user', content: prompt }];
+        const responseCallback = await service.sendRequest(profileId, messages, 600);
+        
+        // Handle stream or text
+        let resultText = "";
+        if (responseCallback && typeof responseCallback === 'string') {
+             resultText = responseCallback;
+        } else if (responseCallback && responseCallback.content) {
+             resultText = responseCallback.content;
+        }
+
+        // 5. Parse JSON
+        // Clean markdown code blocks if present
+        resultText = resultText.replace(/```json/g, "").replace(/```/g, "").trim();
+        const json = JSON.parse(resultText);
+        
+        displayAnalysisResults(json);
+
+    } catch (e) {
+        console.error(e);
+        $('#simple-logic-ai-result').text("Error: " + e.message);
+    }
+}
+
+function displayAnalysisResults(data) {
+    const container = $('#simple-logic-ai-result');
+    container.empty();
+    
+    container.append(`<div><b>Analysis:</b> ${data.analysis}</div><hr>`);
+    
+    data.suggestions.forEach(s => {
+        const card = $(`
+            <div style="border: 1px solid var(--smart-theme-border); padding: 5px; margin-bottom: 5px; border-radius: 5px; background: rgba(0,0,0,0.2);">
+                <div style="display:flex; justify-content:space-between;">
+                    <b>${s.name}</b>
+                    <div class="menu_button menu_button_icon" title="Copy to Editor"><i class="fa-solid fa-paste"></i> Use</div>
+                </div>
+                <pre style="font-size:0.8em; overflow-x:auto;">${s.code}</pre>
+            </div>
+        `);
+        
+        card.find('.menu_button').on('click', () => {
+             $('#simple-logic-name').val(s.name);
+             $('#simple-logic-content').val(s.code);
+             toastr.info("Script copied to editor. Click Save to keep it.");
+        });
+        
+        container.append(card);
+    });
+}
+
+function refreshProfiles() {
+    const context = getContext();
+    const select = $('#simple-logic-ai-profile');
+    select.empty();
+    select.append('<option value="">-- Select AI Profile --</option>');
+    
+    if (context.extensionSettings && context.extensionSettings.connectionManager) {
+        const profiles = context.extensionSettings.connectionManager.profiles || [];
+        profiles.forEach(p => {
+            select.append(`<option value="${p.id}">${p.name}</option>`);
+        });
+    }
+}
+
 // --- UI HANDLING ---
 
 let selectedScriptIndex = -1;
@@ -455,13 +616,37 @@ jQuery(async () => {
                                 <i class="fa-solid fa-plus"></i> New Script
                             </div>
                         </div>
-                        <div id="simple-logic-list" style="overflow-y: auto; height: calc(100% - 40px); display: flex; flex-direction: column; gap: 2px;">
+                        <div id="simple-logic-list" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 2px;">
                             <!-- Script Items will be injected here -->
+                        </div>
+                        
+                        <!-- AI Analysis Section -->
+                        <div style="border-top: 1px solid var(--smart-theme-border); padding-top: 10px; margin-top: 5px; display: flex; flex-direction: column; gap: 5px;">
+                             <b>AI Auto-Script</b>
+                             
+                             <select id="simple-logic-ai-profile" class="text_pole" style="width:100%;" title="Connection Profile"></select>
+                             
+                             <div style="display: flex; gap: 5px;">
+                                <input id="simple-logic-ai-depth" class="text_pole" type="number" value="15" min="1" max="100" style="width: 50%;" title="Analysis Depth (Messages)" placeholder="15" />
+                                <select id="simple-logic-ai-source" class="text_pole" style="width: 50%;" title="Message Source">
+                                    <option value="all">All Sources</option>
+                                    <option value="user">User Only</option>
+                                    <option value="char">Char Only</option>
+                                </select>
+                             </div>
+                             
+                             <select id="simple-logic-ai-mode" class="text_pole" style="width:100%;" title="Output Mode">
+                                <option value="script">Generate Scripts</option>
+                                <option value="keywords">Suggest Keywords</option>
+                                <option value="critique">Analysis Only</option>
+                             </select>
+
+                             <div id="simple-logic-analyze-btn" class="menu_button">Analyze Chat</div>
                         </div>
                     </div>
 
-                    <!-- Right: Editor -->
-                    <div class="simple-logic-editor-area" style="flex: 3; display: flex; flex-direction: column; gap: 10px;">
+                    <!-- Right: Editor & Results -->
+                    <div class="simple-logic-editor-area" style="flex: 2; display: flex; flex-direction: column; gap: 10px;">
                         <div class="simple-logic-header" style="display: flex; gap: 10px; align-items: center;">
                             <span style="font-weight: bold;">Name:</span>
                             <input id="simple-logic-name" class="text_pole" type="text" placeholder="Script Name (e.g. combat_check)" style="flex: 1;" />
@@ -475,8 +660,11 @@ jQuery(async () => {
 
                         <div style="flex: 1; position: relative;">
                             <textarea id="simple-logic-content" class="text_pole" style="width: 100%; height: 100%; font-family: monospace; resize: none;" 
-                            placeholder="IF age > 18&#10;  SAY 'Adult'&#10;ELSE&#10;  SAY 'Minor'&#10;END"></textarea>
+                            placeholder="IF LAST_MESSAGE CONTAINS 'fight'&#10;  IF RANDOM < 0.5&#10;    SAY 'The enemy flinches!'&#10;  END&#10;END"></textarea>
                         </div>
+                        
+                        <!-- AI Results Overlay (Hidden by default, shown when results exist) -->
+                        <div id="simple-logic-ai-result" style="max-height: 150px; overflow-y: auto; border: 1px dashed var(--smart-theme-border); padding: 5px; display: none;"></div>
 
                         <div class="simple-logic-footer">
                             <small>Usage: <code id="simple-logic-usage">{{logic::scriptName}}</code> OR <code id="simple-logic-raw-usage">{{logic::Raw Code}}</code></small>
@@ -496,32 +684,26 @@ jQuery(async () => {
 
     // 2. Init Settings
     loadSettings();
-
-    // 3. Bind UI Events
-    $('#simple-logic-add').on('click', () => {
-        selectedScriptIndex = -1;
-        $('#simple-logic-name').val('');
-        $('#simple-logic-content').val('');
-        renderScriptList();
-    });
-    
-    $('#simple-logic-save').on('click', saveCurrentScript);
-    $('#simple-logic-delete').on('click', deleteCurrentScript);
-    
-    // Initial Render
     renderScriptList();
 
+    // 3. Bind UI Events
+    $('#simple-logic-add').on('click', () => { selectedScriptIndex = -1; loadScriptToEditor(); });
+    $('#simple-logic-save').on('click', saveCurrentScript);
+    $('#simple-logic-delete').on('click', deleteCurrentScript);
 
-
+    // AI Analysis Bindings
+    $('#simple-logic-analyze-btn').on('click', ()=> {
+        $('#simple-logic-ai-result').show();
+        generateAnalysis();
+    });
+    
+    // Refresh profiles on drawer open or init
+    $(document).on('click', '.inline-drawer-toggle', () => {
+         setTimeout(refreshProfiles, 500);
+    });
+    refreshProfiles();
 
     // Register the macro
-    // Note: ST extensions import context dynamically usually.
-    // We hook into the macro registration system.
-    
-    // Wait for context to be ready or register immediately if possible
-    // Using a polling retry or event is safer if `registerMacro` isn't immediately available globally
-    // but typically `getContext` works.
-    
     const registerLogicMacro = () => {
         try {
             // Define the handler function separately to reuse it
